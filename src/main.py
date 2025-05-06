@@ -9,10 +9,20 @@ class BlackjackGame:
     def __init__(self, master):
         self.master = master
         self.master.title("Blackjack Game")
-        self.master.geometry("800x600")
+        self.master.geometry("800x700")
 
         # Set the window icon
         self.master.iconbitmap("src/assets/msc/icon.ico")
+
+        # Initialize balance, bet, and insurance
+        self.balance = 1000  # Starting balance
+        self.bet = 0  # Current bet
+        self.insurance_bet = 0  # Insurance bet
+
+        # Variables for splitting
+        self.second_hand = None
+        self.second_hand_bet = 0
+        self.playing_second_hand = False
 
         # Initialize pygame mixer for sound effects
         pygame.mixer.init()
@@ -47,6 +57,22 @@ class BlackjackGame:
         # Initialize the deck image (card back)
         self.deck_image = self.deck.card_images["back"]  # Ensure this is set correctly
 
+        # Frame for betting and balance
+        betting_frame = tk.Frame(self.master)
+        betting_frame.pack(pady=10)
+
+        # Balance label
+        self.balance_label = tk.Label(betting_frame, text=f"Balance: {self.balance}", font=("Arial", 14))
+        self.balance_label.pack(side=tk.LEFT, padx=10)
+
+        # Bet entry
+        self.bet_entry = tk.Entry(betting_frame, width=10)
+        self.bet_entry.pack(side=tk.LEFT, padx=10)
+
+        # Place Bet button
+        self.place_bet_button = tk.Button(betting_frame, text="Place Bet", command=self.place_bet)
+        self.place_bet_button.pack(side=tk.LEFT, padx=10)
+
         # Frame for action buttons
         button_frame = tk.Frame(self.master)
         button_frame.pack(pady=10)
@@ -60,6 +86,14 @@ class BlackjackGame:
 
         self.fold_button = tk.Button(button_frame, text="Fold", command=self.fold, state=tk.DISABLED)
         self.fold_button.pack(side=tk.LEFT, padx=10)
+
+        # Add Insurance button
+        self.insurance_button = tk.Button(self.master, text="Insurance", command=self.place_insurance, state=tk.DISABLED)
+        self.insurance_button.pack(pady=5)
+
+        # Add Split button
+        self.split_button = tk.Button(self.master, text="Split", command=self.split_hand, state=tk.DISABLED)
+        self.split_button.pack(pady=5)
 
         # Frame for totals
         totals_frame = tk.Frame(self.master)
@@ -151,18 +185,21 @@ class BlackjackGame:
         # Update player's total
         self.update_player_total()
 
-        # Check if the player's hand is 21
-        if self.calculate_hand_total(self.player_hand) == 21:
-            self.message_label.config(text="Blackjack! You automatically stand.")
-            self.stand()  # Automatically stand if the player's hand is 21
-            return
+        # Check if the dealer's face-up card is an Ace
+        if dealer_card1[0] == "Ace":
+            self.message_label.config(text="Dealer shows an Ace! Place insurance?")
+            self.insurance_button.config(state=tk.NORMAL)  # Enable the insurance button
+
+        # Enable Split button if the first two cards are of the same rank
+        if self.player_hand.cards[0][0] == self.player_hand.cards[1][0]:
+            self.split_button.config(state=tk.NORMAL)
 
         # Enable Hit, Stand, and Fold buttons
         self.hit_button.config(state=tk.NORMAL)
         self.stand_button.config(state=tk.NORMAL)
         self.fold_button.config(state=tk.NORMAL)
 
-    def animate_card(self, card, start_pos, end_pos):
+    def animate_card(self, card, start_pos, end_pos, hand_offset=0):
         """
         Animates a card moving from start_pos to end_pos on the canvas.
 
@@ -170,9 +207,13 @@ class BlackjackGame:
             card (tuple or str): The card to animate (e.g., ('Ace', 'Spades')) or "back" for face-down.
             start_pos (tuple): Starting position (x, y) of the card.
             end_pos (tuple): Ending position (x, y) of the card.
+            hand_offset (int): Offset for split hands to avoid overlapping.
         """
         # Play the card draw sound effect
         self.card_draw_sound.play()
+
+        # Adjust the end position for split hands
+        end_pos = (end_pos[0] + hand_offset, end_pos[1])
 
         card_image = self.deck.card_images[card]
         card_id = self.canvas.create_image(start_pos[0], start_pos[1], image=card_image, anchor=tk.NW)
@@ -211,12 +252,22 @@ class BlackjackGame:
         """
         Player chooses to stand. Dealer reveals the face-down card and plays.
         """
+        if self.playing_second_hand:
+            # Finish the second hand and proceed to the dealer's turn
+            self.playing_second_hand = False
+            self.message_label.config(text="Now playing the dealer's turn.")
+        elif self.second_hand:
+            # Switch to the second hand
+            self.playing_second_hand = True
+            self.player_hand = self.second_hand
+            self.second_hand = None
+            self.message_label.config(text="Now playing your second hand.")
+            self.update_player_total()
+            return
+
         # Reveal dealer's face-down card
         face_down_card = self.dealer_hand.cards[1]
         self.animate_card(face_down_card, (300, 100), (300, 100))  # Replace face-down card with actual card
-
-        # Update dealer's total and display it
-        self.update_dealer_total()
 
         # Dealer's turn: follow standard casino rules
         while self.calculate_hand_total(self.dealer_hand) < 17:
@@ -226,10 +277,10 @@ class BlackjackGame:
             self.dealer_hand.add_card(new_card)
             self.update_dealer_total()
 
-        # Determine the winner
+        # Determine the winner for both hands
         self.determine_winner()
 
-        # Disable buttons after standing
+        # Disable buttons after the game ends
         self.hit_button.config(state=tk.DISABLED)
         self.stand_button.config(state=tk.DISABLED)
         self.fold_button.config(state=tk.DISABLED)
@@ -291,28 +342,127 @@ class BlackjackGame:
 
     def declare_bust(self):
         """
-        Declares the player has busted and ends the game.
+        Declares the player has busted and transitions to the next hand or dealer's turn.
         """
         self.message_label.config(text="Bust! You went over 21.")
         self.hit_button.config(state=tk.DISABLED)
         self.stand_button.config(state=tk.DISABLED)
         self.fold_button.config(state=tk.DISABLED)
 
+        if self.playing_second_hand:
+            # Finish the second hand and proceed to the dealer's turn
+            self.playing_second_hand = False
+            self.message_label.config(text="Now playing the dealer's turn.")
+            self.stand()  # Transition to the dealer's turn
+        elif self.second_hand:
+            # Switch to the second hand
+            self.playing_second_hand = True
+            self.player_hand = self.second_hand
+            self.second_hand = None
+            self.message_label.config(text="Now playing your second hand.")
+            self.update_player_total()
+            self.hit_button.config(state=tk.NORMAL)
+            self.stand_button.config(state=tk.NORMAL)
+
     def determine_winner(self):
         """
         Determines the winner of the game and displays the result.
         """
-        player_total = self.calculate_hand_total(self.player_hand)
-        dealer_total = self.calculate_hand_total(self.dealer_hand)
+        def resolve_hand(hand, bet):
+            player_total = self.calculate_hand_total(hand)
+            dealer_total = self.calculate_hand_total(self.dealer_hand)
 
-        if dealer_total > 21:
-            self.message_label.config(text="Dealer busts! You win!")
-        elif player_total > dealer_total:
-            self.message_label.config(text="You win!")
-        elif player_total < dealer_total:
-            self.message_label.config(text="Dealer wins!")
-        else:
-            self.message_label.config(text="It's a tie!")
+            if dealer_total > 21:
+                self.message_label.config(text="Dealer busts! You win!")
+                self.balance += bet * 2  # Player wins double the bet
+            elif player_total > dealer_total:
+                self.message_label.config(text="You win!")
+                self.balance += bet * 2  # Player wins double the bet
+            elif player_total < dealer_total:
+                self.message_label.config(text="Dealer wins!")
+                # Player loses the bet (balance already deducted)
+            else:
+                self.message_label.config(text="It's a tie!")
+                self.balance += bet  # Return the bet on a tie
+
+        # Resolve the first hand
+        resolve_hand(self.player_hand, self.bet)
+
+        # Resolve the second hand if it exists
+        if self.second_hand:
+            resolve_hand(self.second_hand, self.second_hand_bet)
+
+        # Update balance label
+        self.balance_label.config(text=f"Balance: {self.balance}")
+
+    def place_bet(self):
+        """
+        Places a bet and updates the balance.
+        """
+        try:
+            bet = int(self.bet_entry.get())
+            if bet <= 0:
+                self.message_label.config(text="Bet must be greater than 0.")
+                return
+            if bet > self.balance:
+                self.message_label.config(text="Insufficient balance!")
+                return
+
+            self.bet = bet
+            self.balance -= bet
+            self.balance_label.config(text=f"Balance: {self.balance}")
+            self.message_label.config(text=f"Bet placed: {self.bet}")
+            self.start_game()  # Start the game after placing the bet
+        except ValueError:
+            self.message_label.config(text="Invalid bet amount.")
+
+    def place_insurance(self):
+        """
+        Allows the player to place an insurance bet.
+        """
+        try:
+            insurance_bet = self.bet // 2  # Insurance bet is up to half of the original bet
+            if insurance_bet > self.balance:
+                self.message_label.config(text="Insufficient balance for insurance!")
+                return
+
+            self.insurance_bet = insurance_bet
+            self.balance -= insurance_bet
+            self.balance_label.config(text=f"Balance: {self.balance}")
+            self.message_label.config(text=f"Insurance bet placed: {self.insurance_bet}")
+            self.insurance_button.config(state=tk.DISABLED)  # Disable the button after placing the bet
+        except ValueError:
+            self.message_label.config(text="Error placing insurance bet.")
+
+    def split_hand(self):
+        """
+        Splits the player's hand into two hands if the first two cards are of the same rank.
+        """
+        if self.player_hand.cards[0][0] != self.player_hand.cards[1][0]:
+            self.message_label.config(text="Cannot split: Cards must be of the same rank.")
+            return
+
+        if self.bet > self.balance:
+            self.message_label.config(text="Insufficient balance to split!")
+            return
+
+        # Deduct the bet for the second hand
+        self.second_hand_bet = self.bet
+        self.balance -= self.second_hand_bet
+        self.balance_label.config(text=f"Balance: {self.balance}")
+
+        # Create the second hand
+        self.second_hand = Hand()
+        split_card = self.player_hand.cards.pop()  # Move one card to the second hand
+        self.second_hand.add_card(split_card)
+
+        # Animate the split card to the second hand's position
+        self.animate_card(split_card, (300, 300), (500, 300), hand_offset=100)
+
+        # Update the UI
+        self.message_label.config(text="Hand split! Play your first hand.")
+        self.split_button.config(state=tk.DISABLED)  # Disable the split button
+        self.update_player_total()
 
 if __name__ == "__main__":
     root = tk.Tk()
