@@ -11,10 +11,13 @@ class BlackjackGame:
         self.master.title("Blackjack Game")
         self.master.geometry("800x600")
 
+        # Set the window icon
+        self.master.iconbitmap("src/assets/msc/icon.ico")
+
         # Initialize pygame mixer for sound effects
         pygame.mixer.init()
         self.card_draw_sound = pygame.mixer.Sound("src/assets/sounds/card_draw.wav")
-        self.card_draw_sound.set_volume(0.5)  # Default volume (50%)
+        self.card_draw_sound.set_volume(0.2)  # Default volume (20%)
 
         self.deck = Deck()
         self.player_hand = Hand()
@@ -23,42 +26,56 @@ class BlackjackGame:
         self.setup_ui()
 
     def setup_ui(self):
-        # Setup UI elements like buttons, labels, and canvas for cards
+        # Setup menu bar
+        menu_bar = tk.Menu(self.master)
+        self.master.config(menu=menu_bar)
+
+        # Add "Game" menu
+        game_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="Game", menu=game_menu)
+        game_menu.add_command(label="Start Game", command=self.start_game)
+
+        # Add "Settings" menu
+        settings_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="Settings", menu=settings_menu)
+        settings_menu.add_command(label="Volume", command=self.open_settings)
+
+        # Setup canvas for cards
         self.canvas = tk.Canvas(self.master, width=800, height=400, bg='green')
         self.canvas.pack()
 
-        # Add Settings button
-        self.settings_button = tk.Button(self.master, text="Settings", command=self.open_settings)
-        self.settings_button.pack(side=tk.TOP, pady=5)
+        # Initialize the deck image (card back)
+        self.deck_image = self.deck.card_images["back"]  # Ensure this is set correctly
 
-        self.start_button = tk.Button(self.master, text="Start Game", command=self.start_game)
-        self.start_button.pack()
+        # Frame for action buttons
+        button_frame = tk.Frame(self.master)
+        button_frame.pack(pady=10)
 
-        # Add Hit, Stand, and Fold buttons (hidden initially)
-        self.hit_button = tk.Button(self.master, text="Hit", command=self.hit, state=tk.DISABLED)
+        # Add Hit, Stand, and Fold buttons (centered)
+        self.hit_button = tk.Button(button_frame, text="Hit", command=self.hit, state=tk.DISABLED)
         self.hit_button.pack(side=tk.LEFT, padx=10)
 
-        self.stand_button = tk.Button(self.master, text="Stand", command=self.stand, state=tk.DISABLED)
+        self.stand_button = tk.Button(button_frame, text="Stand", command=self.stand, state=tk.DISABLED)
         self.stand_button.pack(side=tk.LEFT, padx=10)
 
-        self.fold_button = tk.Button(self.master, text="Fold", command=self.fold, state=tk.DISABLED)
+        self.fold_button = tk.Button(button_frame, text="Fold", command=self.fold, state=tk.DISABLED)
         self.fold_button.pack(side=tk.LEFT, padx=10)
 
-        # Display the deck of cards in the corner
-        self.deck_image = self.deck.card_images["back"]
-        self.canvas.create_image(50, 200, image=self.deck_image, anchor=tk.NW)
+        # Frame for totals
+        totals_frame = tk.Frame(self.master)
+        totals_frame.pack(pady=10)
 
-        # Label to display the player's total
-        self.player_total_label = tk.Label(self.master, text="Player Total: 0", font=("Arial", 14))
+        # Label to display the player's total (centered)
+        self.player_total_label = tk.Label(totals_frame, text="Player Total: 0", font=("Arial", 14))
         self.player_total_label.pack()
 
-        # Label to display the dealer's total (hidden initially)
-        self.dealer_total_label = tk.Label(self.master, text="Dealer Total: ?", font=("Arial", 14))
+        # Label to display the dealer's total (centered)
+        self.dealer_total_label = tk.Label(totals_frame, text="Dealer Total: ?", font=("Arial", 14))
         self.dealer_total_label.pack()
 
-        # Label to display game messages
+        # Label to display game messages (centered)
         self.message_label = tk.Label(self.master, text="", font=("Arial", 14), fg="red")
-        self.message_label.pack()
+        self.message_label.pack(pady=10)
 
     def open_settings(self):
         """
@@ -67,6 +84,9 @@ class BlackjackGame:
         settings_window = Toplevel(self.master)
         settings_window.title("Settings")
         settings_window.geometry("300x100")
+
+        # Set the icon for the settings window
+        settings_window.iconbitmap("src/assets/msc/icon.ico")
 
         tk.Label(settings_window, text="Volume", font=("Arial", 12)).pack(pady=5)
 
@@ -130,6 +150,12 @@ class BlackjackGame:
 
         # Update player's total
         self.update_player_total()
+
+        # Check if the player's hand is 21
+        if self.calculate_hand_total(self.player_hand) == 21:
+            self.message_label.config(text="Blackjack! You automatically stand.")
+            self.stand()  # Automatically stand if the player's hand is 21
+            return
 
         # Enable Hit, Stand, and Fold buttons
         self.hit_button.config(state=tk.NORMAL)
