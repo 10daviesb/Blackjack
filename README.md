@@ -67,4 +67,8 @@ blackjack-game
 - 💰 Implement betting mechanics with virtual chips.
 - 🎵 Add more sound effects for winning, losing, and other game events.
 
+## 🐛 Known Bugs
+- ✂️ Split function isn't UI/UX friendly at the moment. Second hand currently unplayable
+- ✌️ Missing features like double down
+
 Enjoy the game! 🎉
