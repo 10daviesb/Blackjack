@@ -1,5 +1,9 @@
 # 🃏 Blackjack Game
 
+![Build Status](https://img.shields.io/github/actions/workflow/status/10daviesb/Blackjack/main.yml?branch=main)
+![License](https://img.shields.io/github/license/10daviesb/Blackjack)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue)
+
 A Python-based Blackjack game with a graphical user interface (GUI) built using `tkinter`. The game includes features like betting, splitting hands, insurance, and animations for card movements.
 
 ## 🎮 Overview
