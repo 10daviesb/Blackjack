@@ -76,24 +76,29 @@ class BlackjackGame:
         # Frame for action buttons
         button_frame = tk.Frame(self.master)
         button_frame.pack(pady=10)
-
+        
         # Add Hit, Stand, and Fold buttons (centered)
         self.hit_button = tk.Button(button_frame, text="Hit", command=self.hit, state=tk.DISABLED)
         self.hit_button.pack(side=tk.LEFT, padx=10)
-
+        
         self.stand_button = tk.Button(button_frame, text="Stand", command=self.stand, state=tk.DISABLED)
         self.stand_button.pack(side=tk.LEFT, padx=10)
-
+        
         self.fold_button = tk.Button(button_frame, text="Fold", command=self.fold, state=tk.DISABLED)
         self.fold_button.pack(side=tk.LEFT, padx=10)
-
+        
+        # Create a new frame for the Insurance and Split buttons
+        bottom_button_frame = tk.Frame(self.master)
+        bottom_button_frame.pack(pady=10)
+        
         # Add Insurance button
-        self.insurance_button = tk.Button(self.master, text="Insurance", command=self.place_insurance, state=tk.DISABLED)
-        self.insurance_button.pack(pady=5)
-
+        self.insurance_button = tk.Button(bottom_button_frame, text="Insurance", command=self.place_insurance, state=tk.DISABLED)
+        self.insurance_button.pack(side=tk.LEFT, padx=10)
+        
         # Add Split button
-        self.split_button = tk.Button(self.master, text="Split", command=self.split_hand, state=tk.DISABLED)
-        self.split_button.pack(pady=5)
+        self.split_button = tk.Button(bottom_button_frame, text="Split", command=self.split_hand, state=tk.DISABLED)
+        self.split_button.pack(side=tk.LEFT, padx=10)
+
 
         # Frame for totals
         totals_frame = tk.Frame(self.master)
@@ -239,13 +244,21 @@ class BlackjackGame:
         Player chooses to draw another card.
         """
         new_card = self.draw_card_with_reshuffle()
-        x_offset = 150 + len(self.player_hand.cards) * 50  # Offset for new card
-        self.animate_card(new_card, (50, 200), (x_offset, 300))
-        self.player_hand.add_card(new_card)
+
+        if self.playing_second_hand:
+            # Hits for the second hand (offset by 25px)
+            x_offset = 150 + len(self.second_hand.cards) * 50  # Offset for new card
+            self.animate_card(new_card, (50, 200), (x_offset, 325))  # Push down by 25px
+            self.second_hand.add_card(new_card)
+        else:
+            # Hits for the first hand
+            x_offset = 150 + len(self.player_hand.cards) * 50  # Offset for new card
+            self.animate_card(new_card, (50, 200), (x_offset, 300))
+            self.player_hand.add_card(new_card)
 
         # Update player's total and check for bust
         self.update_player_total()
-        if self.calculate_hand_total(self.player_hand) > 21:
+        if self.calculate_hand_total(self.player_hand if not self.playing_second_hand else self.second_hand) > 21:
             self.declare_bust()
 
     def stand(self):
@@ -371,29 +384,35 @@ class BlackjackGame:
         """
         Determines the winner of the game and displays the result.
         """
-        def resolve_hand(hand, bet):
+        def resolve_hand(hand, bet, hand_name):
             player_total = self.calculate_hand_total(hand)
             dealer_total = self.calculate_hand_total(self.dealer_hand)
 
             if dealer_total > 21:
-                self.message_label.config(text="Dealer busts! You win!")
+                result = f"{hand_name}: Dealer busts! You win!"
                 self.balance += bet * 2  # Player wins double the bet
             elif player_total > dealer_total:
-                self.message_label.config(text="You win!")
+                result = f"{hand_name}: You win!"
                 self.balance += bet * 2  # Player wins double the bet
             elif player_total < dealer_total:
-                self.message_label.config(text="Dealer wins!")
+                result = f"{hand_name}: Dealer wins!"
                 # Player loses the bet (balance already deducted)
             else:
-                self.message_label.config(text="It's a tie!")
+                result = f"{hand_name}: It's a tie!"
                 self.balance += bet  # Return the bet on a tie
 
+            return result
+
         # Resolve the first hand
-        resolve_hand(self.player_hand, self.bet)
+        first_hand_result = resolve_hand(self.player_hand, self.bet, "First Hand")
 
         # Resolve the second hand if it exists
+        second_hand_result = ""
         if self.second_hand:
-            resolve_hand(self.second_hand, self.second_hand_bet)
+            second_hand_result = resolve_hand(self.second_hand, self.second_hand_bet, "Second Hand")
+
+        # Display results
+        self.message_label.config(text=f"{first_hand_result}\n{second_hand_result}")
 
         # Update balance label
         self.balance_label.config(text=f"Balance: {self.balance}")
@@ -459,8 +478,8 @@ class BlackjackGame:
         split_card = self.player_hand.cards.pop()  # Move one card to the second hand
         self.second_hand.add_card(split_card)
 
-        # Animate the split card to the second hand's position
-        self.animate_card(split_card, (300, 300), (200, 300), overlap_offset=50)
+        # Animate the split card to the second hand's position (pushed down by 25px)
+        self.animate_card(split_card, (300, 300), (200, 325), overlap_offset=50)
 
         # Update the UI
         self.message_label.config(text="Hand split! Play your first hand.")
