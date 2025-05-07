@@ -167,19 +167,19 @@ class BlackjackGame:
 
         # Deal cards like real blackjack
         player_card1 = self.draw_card_with_reshuffle()
-        self.animate_card(player_card1, (50, 200), (200, 300))  # Player's first card
+        self.animate_card(player_card1, (50, 200), (200, 300), overlap_offset=0)  # Player's first card
         self.player_hand.add_card(player_card1)
 
         dealer_card1 = self.draw_card_with_reshuffle()
-        self.animate_card(dealer_card1, (50, 200), (200, 100))  # Dealer's first card
+        self.animate_card(dealer_card1, (50, 200), (200, 100), overlap_offset=0)  # Dealer's first card
         self.dealer_hand.add_card(dealer_card1)
 
         player_card2 = self.draw_card_with_reshuffle()
-        self.animate_card(player_card2, (50, 200), (300, 300))  # Player's second card
+        self.animate_card(player_card2, (50, 200), (200, 300), overlap_offset=50)  # Player's second card
         self.player_hand.add_card(player_card2)
 
         dealer_card2 = self.draw_card_with_reshuffle()
-        self.animate_card("back", (50, 200), (300, 100))  # Dealer's second card (face down)
+        self.animate_card("back", (50, 200), (200, 100), overlap_offset=50)  # Dealer's second card (face down)
         self.dealer_hand.add_card(dealer_card2)  # Add the face-down card to the dealer's hand
 
         # Update player's total
@@ -199,7 +199,7 @@ class BlackjackGame:
         self.stand_button.config(state=tk.NORMAL)
         self.fold_button.config(state=tk.NORMAL)
 
-    def animate_card(self, card, start_pos, end_pos, hand_offset=0):
+    def animate_card(self, card, start_pos, end_pos, overlap_offset=50):
         """
         Animates a card moving from start_pos to end_pos on the canvas.
 
@@ -207,13 +207,13 @@ class BlackjackGame:
             card (tuple or str): The card to animate (e.g., ('Ace', 'Spades')) or "back" for face-down.
             start_pos (tuple): Starting position (x, y) of the card.
             end_pos (tuple): Ending position (x, y) of the card.
-            hand_offset (int): Offset for split hands to avoid overlapping.
+            overlap_offset (int): Offset for overlapping cards within the same hand.
         """
         # Play the card draw sound effect
         self.card_draw_sound.play()
 
-        # Adjust the end position for split hands
-        end_pos = (end_pos[0] + hand_offset, end_pos[1])
+        # Adjust the end position for overlapping cards
+        end_pos = (end_pos[0] + overlap_offset, end_pos[1])
 
         card_image = self.deck.card_images[card]
         card_id = self.canvas.create_image(start_pos[0], start_pos[1], image=card_image, anchor=tk.NW)
@@ -239,7 +239,7 @@ class BlackjackGame:
         Player chooses to draw another card.
         """
         new_card = self.draw_card_with_reshuffle()
-        x_offset = 200 + len(self.player_hand.cards) * 100  # Offset for new card
+        x_offset = 150 + len(self.player_hand.cards) * 50  # Offset for new card
         self.animate_card(new_card, (50, 200), (x_offset, 300))
         self.player_hand.add_card(new_card)
 
@@ -267,12 +267,15 @@ class BlackjackGame:
 
         # Reveal dealer's face-down card
         face_down_card = self.dealer_hand.cards[1]
-        self.animate_card(face_down_card, (300, 100), (300, 100))  # Replace face-down card with actual card
+        self.animate_card(face_down_card, (250, 100), (250, 100), overlap_offset=0)  # Adjusted for overlap
+
+        # Update dealer's total immediately after revealing the card
+        self.update_dealer_total()
 
         # Dealer's turn: follow standard casino rules
         while self.calculate_hand_total(self.dealer_hand) < 17:
             new_card = self.draw_card_with_reshuffle()
-            x_offset = 200 + len(self.dealer_hand.cards) * 100  # Offset for new card
+            x_offset = 150 + len(self.dealer_hand.cards) * 50  # Offset for new card
             self.animate_card(new_card, (50, 200), (x_offset, 100))
             self.dealer_hand.add_card(new_card)
             self.update_dealer_total()
@@ -457,7 +460,7 @@ class BlackjackGame:
         self.second_hand.add_card(split_card)
 
         # Animate the split card to the second hand's position
-        self.animate_card(split_card, (300, 300), (500, 300), hand_offset=100)
+        self.animate_card(split_card, (300, 300), (200, 300), overlap_offset=50)
 
         # Update the UI
         self.message_label.config(text="Hand split! Play your first hand.")
